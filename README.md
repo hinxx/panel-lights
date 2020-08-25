@@ -58,7 +58,7 @@ using the same color) the LED driving inline assembly code was modified to
 use only two colors. This resulted in big memory saving. Also, unused functinality
 of the NeoPixel library was stripped off to reduce code footprint. 
 
-# Sequences
+# Sequences and steps
 
 As mentioned earlier, sequence (list of steps) is stored in a text file. Each
 step of a sequence needs to be defined as a string of text. Individual values
