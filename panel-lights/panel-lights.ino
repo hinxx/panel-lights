@@ -546,7 +546,7 @@ void setup() {
   // Setup Serial Monitor
   Serial.begin (115200);
   while (!Serial) {}
-  Serial.println("EXF v0.6");
+  Serial.println("panel lights v0.7");
   
   // clear the display
 //  timeMillis= millis();/
@@ -554,7 +554,7 @@ void setup() {
 //  timeMillis= millis() - timeMillis;/
 //  Serial.print("OLED clear took ");/
   Serial.println(timeMillis, DEC);
-  oledDrawText(0, 0, "EXF v0.6", RED);
+  oledDrawText(0, 0, "panel lights v0.7", RED);
 
   if (! SD.begin(SDCS_PIN)) {
     Serial.println("SD init failed!");
