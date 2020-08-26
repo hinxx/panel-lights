@@ -271,13 +271,35 @@ int main(int, char**)
                 ImGui::Text("Wait"); ImGui::NextColumn();
                 ImGui::Separator();
                 for (int n = 0; n < sequence.count(); n++) {
+                    ImGuiColorEditFlags flags1 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
+                    ImGuiColorEditFlags flags2 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
                     Step *step = sequence.step(n);
                     ImGui::PushID(n);
                     ImGui::Text("%04d", n+1);
                     ImGui::NextColumn();
-                    ImGui::ColorEdit3("color1", (float*)&step->color1Vec, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
+                    // in case of random color mode disable the color picker and grey out the button
+                    if (step->random1) {
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.1f);
+                        flags1 |= ImGuiColorEditFlags_NoPicker;
+                    }
+                    ImGui::ColorEdit3("color1", (float*)&step->color1Vec, flags1);
+                    if (step->random1) {
+                        ImGui::PopStyleVar();
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("###random 1", &step->random1);
                     ImGui::NextColumn();
-                    ImGui::ColorEdit3("color2", (float*)&step->color2Vec, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
+                    // in case of random color mode disable the color picker and grey out the button
+                    if (step->random2) {
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.1f);
+                        flags2 |= ImGuiColorEditFlags_NoPicker;
+                    }
+                    ImGui::ColorEdit3("color2", (float*)&step->color2Vec, flags2);
+                    if (step->random2) {
+                        ImGui::PopStyleVar();
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("##random 2", &step->random2);
                     ImGui::NextColumn();
                     ImGui::SliderFloat("", &step->waitf, 1.0f, 9.9f, "%.1f s");
                     ImGui::NextColumn();
@@ -287,16 +309,13 @@ int main(int, char**)
                 ImGui::Separator();
 
                 static int playing = 0;
-//                static double startTime = 0;
                 static double elapsedTime = 0;
                 static double sequenceTime = 0;
-//                ImGui::Text("Time %f, start time %f, elapsed time %f\n", ImGui::GetTime(), startTime, elapsedTime);
 
                 if (ImGui::Button("Play")) {
                     fprintf(stderr, "sequence play: Start\n");
                     playing = 1;
                     elapsedTime = 0;
-//                    startTime = ImGui::GetTime();
                     sequenceTime = 0;
                     for (int n = 0; n < sequence.count(); n++) {
                         Step *step = sequence.step(n);
@@ -308,12 +327,10 @@ int main(int, char**)
                     playing = 0;
                     sequenceTime = 0;
                     elapsedTime = 0;
-//                    startTime = 0;
                 }
 
                 if (playing) {
                     ImGuiColorEditFlags flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop;
-//                    elapsedTime += (ImGui::GetTime() - startTime);
                     elapsedTime += ImGuiIO().DeltaTime;
                     double runTime = 0;
                     Step *step = NULL;
@@ -333,24 +350,6 @@ int main(int, char**)
                         elapsedTime = 0;
                         fprintf(stderr, "sequence play: Loop\n");
                     }
-
-//                    Step *step = NULL;
-//                    int n = 0;
-//                    double runTime = 0;
-//                    do {
-//                        step = sequence.step(n);
-//                        runTime += step->waitf;
-//                        fprintf(stderr, "sequence play: Step %d, sequenceTime %f, elapsedTime %f\n", n, sequenceTime, elapsedTime);
-//                        n++;
-//                    } while (n < sequence.count() && runTime < sequenceTime);
-//                    if ((elapsedTime + ImGuiIO().DeltaTime) > sequenceTime) {
-//                        elapsedTime = 0;
-//                        fprintf(stderr, "sequence play: Loop\n");
-//                    } else {
-//                        ImGui::ColorButton("###Panel 1", step->color1Vec, flags, ImVec2(100, 100));
-//                        ImGui::SameLine();
-//                        ImGui::ColorButton("###Panel 2", step->color2Vec, flags, ImVec2(100, 100));
-//                    }
                 }
             }
 

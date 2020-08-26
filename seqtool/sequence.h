@@ -70,6 +70,8 @@ struct Step {
     unsigned int wait;
     ImVec4 color1Vec, color2Vec;
     float waitf;
+    bool random1;
+    bool random2;
 
     Step(unsigned char mode1_, unsigned int color1_, unsigned char mode2_, unsigned int color2_, unsigned int wait_) {
         mode1 = mode1_;
@@ -89,6 +91,9 @@ struct Step {
         color2Vec.y = (color2_ >> 8) & 0xFF;
         color2Vec.z = (color2_ >> 0) & 0xFF;
         color2Vec.w = 0;
+
+        random1 = (mode1 & 0x01) ? true : false;
+        random2 = (mode2 & 0x01) ? true : false;
     }
 };
 
