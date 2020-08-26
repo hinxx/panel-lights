@@ -259,7 +259,7 @@ int main(int, char**)
                 }
 #endif
                 ImGui::Text("List of steps");
-                ImGui::Columns(4, "listofsteps"); // 4-ways, with border
+                ImGui::Columns(4, "listofsteps");
                 ImGui::SetColumnWidth(0, 60);
                 ImGui::SetColumnWidth(1, 60);
                 ImGui::SetColumnWidth(2, 60);
@@ -282,7 +282,8 @@ int main(int, char**)
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.1f);
                         flags1 |= ImGuiColorEditFlags_NoPicker;
                     }
-                    ImGui::ColorEdit3("color1", (float*)&step->color1Vec, flags1);
+                    ImVec4 color1 = ImColor(step->color1);
+                    ImGui::ColorEdit3("color1", (float *)&color1, flags1);
                     if (step->random1) {
                         ImGui::PopStyleVar();
                     }
@@ -294,7 +295,8 @@ int main(int, char**)
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.1f);
                         flags2 |= ImGuiColorEditFlags_NoPicker;
                     }
-                    ImGui::ColorEdit3("color2", (float*)&step->color2Vec, flags2);
+                    ImVec4 color2 = ImColor(step->color2);
+                    ImGui::ColorEdit3("color2", (float*)&color2, flags2);
                     if (step->random2) {
                         ImGui::PopStyleVar();
                     }
@@ -343,9 +345,9 @@ int main(int, char**)
                         }
                     }
                     ImGui::Text("Step # %d, elapsed time %f\n", stepIndex+1, elapsedTime);
-                    ImGui::ColorButton("###Panel 1", step->color1Vec, flags, ImVec2(100, 100));
+                    ImGui::ColorButton("###Panel 1", ImColor(step->color1), flags, ImVec2(100, 100));
                     ImGui::SameLine();
-                    ImGui::ColorButton("###Panel 2", step->color2Vec, flags, ImVec2(100, 100));
+                    ImGui::ColorButton("###Panel 2", ImColor(step->color2), flags, ImVec2(100, 100));
                     if (elapsedTime > sequenceTime) {
                         elapsedTime = 0;
                         fprintf(stderr, "sequence play: Loop\n");

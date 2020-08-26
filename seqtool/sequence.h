@@ -62,35 +62,23 @@ struct FileList {
 
 struct Step {
     unsigned char mode1;
-//    ImVec4 color1;
     unsigned int color1;
     unsigned char mode2;
-//    ImVec4 color2;
     unsigned int color2;
     unsigned int wait;
-    ImVec4 color1Vec, color2Vec;
     float waitf;
     bool random1;
     bool random2;
 
     Step(unsigned char mode1_, unsigned int color1_, unsigned char mode2_, unsigned int color2_, unsigned int wait_) {
         mode1 = mode1_;
-        color1 = color1_;//ImVec4((color1_ >> 16) & 0xFF, (color1_ >> 8) & 0xFF, (color1_ >> 0) & 0xFF, 0);
+        color1 = color1_;
         mode2 = mode2_;
-        color2 = color2_;//ImVec4((color2_ >> 16) & 0xFF, (color2_ >> 8) & 0xFF, (color2_ >> 0) & 0xFF, 0);
+        color2 = color2_;
         // file holds value in ms
         wait = wait_ * 100;
         // time in s
         waitf = (float)wait_ / 10.0f;
-
-        color1Vec.x = (color1_ >> 16) & 0xFF;
-        color1Vec.y = (color1_ >> 8) & 0xFF;
-        color1Vec.z = (color1_ >> 0) & 0xFF;
-        color1Vec.w = 0;
-        color2Vec.x = (color2_ >> 16) & 0xFF;
-        color2Vec.y = (color2_ >> 8) & 0xFF;
-        color2Vec.z = (color2_ >> 0) & 0xFF;
-        color2Vec.w = 0;
 
         random1 = (mode1 & 0x01) ? true : false;
         random2 = (mode2 & 0x01) ? true : false;
