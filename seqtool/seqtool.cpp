@@ -226,8 +226,12 @@ int main(int, char**)
                     sequence = loadSequence(fileName);
                     for (int n = 0; n < sequence.count(); n++) {
                         Step step = sequence.data[n];
-                        fprintf(stderr, "panel1: mode %d, color %06X | panel2: mode %d, color %06X | wait %d\n",
-                                step.mode1, step.color1, step.mode2, step.color2, step.wait);
+                        fprintf(stderr, "panel1: mode %d, color %06X | panel2: mode %d, color %06X | wait %f s\n",
+                                step.mode1,
+                                (unsigned int)ImColor(step.color1[0], step.color1[1], step.color1[2], .0f),
+                                step.mode2,
+                                (unsigned int)ImColor(step.color2[0], step.color2[1], step.color2[2], .0f),
+                                step.duration);
                     }
                     // reset playing
                     playing = false;
@@ -264,8 +268,7 @@ int main(int, char**)
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.1f);
                         flags1 |= ImGuiColorEditFlags_NoPicker;
                     }
-                    ImVec4 color1 = ImColor(step->color1);
-                    ImGui::ColorEdit3("color1", (float *)&color1, flags1);
+                    ImGui::ColorEdit3("color1", (float *)&step->color1, flags1);
                     if (step->random1) {
                         ImGui::PopStyleVar();
                     }
@@ -277,29 +280,69 @@ int main(int, char**)
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.1f);
                         flags2 |= ImGuiColorEditFlags_NoPicker;
                     }
-                    ImVec4 color2 = ImColor(step->color2);
-                    ImGui::ColorEdit3("color2", (float*)&color2, flags2);
+                    ImGui::ColorEdit3("color2", (float*)&step->color2, flags2);
                     if (step->random2) {
                         ImGui::PopStyleVar();
                     }
                     ImGui::SameLine();
                     ImGui::Checkbox("##random 2", &step->random2);
                     ImGui::NextColumn();
-                    if (ImGui::SliderFloat("", &step->waitf, 1.0f, 9.9f, "%.1f s")) {
+                    if (ImGui::SliderFloat("", &step->duration, 1.0f, 9.9f, "%.1f s")) {
                         // value has changed, recalculate sequence duration
                         sequence.calcDuration();
                     }
                     ImGui::NextColumn();
                     ImGui::PopID();
                 }
+                ImGui::Separator();
+
+                // controls for adding a new step (append to sequence)
+                static Step newStep;
+                if (ImGui::Button("Add step")) {
+                    fprintf(stderr, "sequence: Add step\n");
+                    sequence.addStep(newStep);
+                    // sequence has a new step, recalculate sequence duration
+                    sequence.calcDuration();
+                }
+                static ImGuiColorEditFlags flags1 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
+                static ImGuiColorEditFlags flags2 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
+                ImGui::NextColumn();
+                // in case of random color mode disable the color picker and grey out the button
+                if (newStep.random1) {
+                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.1f);
+                    flags1 |= ImGuiColorEditFlags_NoPicker;
+                }
+                ImGui::ColorEdit3("new color1", (float *)&newStep.color1, flags1);
+                if (newStep.random1) {
+                    ImGui::PopStyleVar();
+                }
+                ImGui::SameLine();
+                ImGui::Checkbox("###new random 1", &newStep.random1);
+                ImGui::NextColumn();
+                // in case of random color mode disable the color picker and grey out the button
+                if (newStep.random2) {
+                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.1f);
+                    flags2 |= ImGuiColorEditFlags_NoPicker;
+                }
+                ImGui::ColorEdit3("new color2", (float*)&newStep.color2, flags2);
+                if (newStep.random2) {
+                    ImGui::PopStyleVar();
+                }
+                ImGui::SameLine();
+                ImGui::Checkbox("##new random 2", &newStep.random2);
+                ImGui::NextColumn();
+                ImGui::SliderFloat("", &newStep.duration, 1.0f, 9.9f, "%.1f s");
+                ImGui::NextColumn();
                 ImGui::Columns(1);
                 ImGui::Separator();
 
+                // sequence play/stop controls
                 if (ImGui::Button("Play")) {
                     fprintf(stderr, "sequence play: Start\n");
                     playing = true;
                     elapsedTime = 0;
                 }
+                ImGui::SameLine(0, 20);
                 if (ImGui::Button("Stop")) {
                     fprintf(stderr, "sequence play: Stop\n");
                     playing = false;
@@ -314,15 +357,17 @@ int main(int, char**)
                     int stepIndex = 0;
                     for (stepIndex = 0; stepIndex < sequence.count(); stepIndex++) {
                         step = sequence.step(stepIndex);
-                        runTime += step->waitf;
+                        runTime += step->duration;
                         if (elapsedTime < runTime) {
                             break;
                         }
                     }
                     ImGui::Text("Step # %d, elapsed time %.2f / %.2f\n", stepIndex+1, elapsedTime, sequence.duration);
-                    ImGui::ColorButton("###Panel 1", ImColor(step->color1), flags, ImVec2(100, 100));
+                    ImVec4 color1 = ImColor(step->color1[0], step->color1[1], step->color1[2]);
+                    ImGui::ColorButton("###Panel 1", color1, flags, ImVec2(100, 100));
                     ImGui::SameLine();
-                    ImGui::ColorButton("###Panel 2", ImColor(step->color2), flags, ImVec2(100, 100));
+                    ImVec4 color2 = ImColor(step->color2[0], step->color2[1], step->color2[2]);
+                    ImGui::ColorButton("###Panel 2", color2, flags, ImVec2(100, 100));
                     if (elapsedTime > sequence.duration) {
                         elapsedTime = 0;
                         fprintf(stderr, "sequence play: Loop\n");

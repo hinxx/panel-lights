@@ -61,27 +61,34 @@ struct FileList {
 };
 
 struct Step {
-    unsigned char mode1;
-    unsigned int color1;
-    unsigned char mode2;
-    unsigned int color2;
-    unsigned int wait;
-    float waitf;
-    bool random1;
-    bool random2;
+    unsigned char mode1 = 0;
+    unsigned char mode2 = 0;
+    bool random1 = false;
+    bool random2 = false;
+    // keep color as an array of floats friendly to ImGui::ColorEdit3()
+    // with which the changes to the color can be made
+    float color1[3] = { 0.0f, 0.0f, 0.0f };
+    float color2[3] = { 0.0f, 0.0f, 0.0f };
+    // keep duration in seconds
+    float duration = 1.0f;
 
-    Step(unsigned char mode1_, unsigned int color1_, unsigned char mode2_, unsigned int color2_, unsigned int wait_) {
+    Step() {}
+
+    Step(unsigned char mode1_, unsigned int color1_, unsigned char mode2_, unsigned int color2_, unsigned int duration_) {
         mode1 = mode1_;
-        color1 = color1_;
-        mode2 = mode2_;
-        color2 = color2_;
-        // file holds value in ms
-        wait = wait_ * 100;
-        // time in s
-        waitf = (float)wait_ / 10.0f;
-
         random1 = (mode1 & 0x01) ? true : false;
+        color1[0] = (1.0f / 255.0f) * ((color1_ >> 16) & 0xFF);
+        color1[1] = (1.0f / 255.0f) * ((color1_ >> 8) & 0xFF);
+        color1[2] = (1.0f / 255.0f) * ((color1_ >> 0) & 0xFF);
+
+        mode2 = mode2_;
         random2 = (mode2 & 0x01) ? true : false;
+        color2[0] = (1.0f / 255.0f) * ((color2_ >> 16) & 0xFF);
+        color2[1] = (1.0f / 255.0f) * ((color2_ >> 8) & 0xFF);
+        color2[2] = (1.0f / 255.0f) * ((color2_ >> 0) & 0xFF);
+
+        // file holds value in ms, keep duration in seconds
+        duration = ((float)duration_ * 100.0f) / 1000.0f;
     }
 };
 
@@ -119,7 +126,7 @@ struct Sequence {
     void calcDuration() {
         float duration_ = 0;
         for (int n = 0; n < data.size(); n++) {
-            duration_ += data[n].waitf;
+            duration_ += data[n].duration;
         }
         duration = duration_;
     }
