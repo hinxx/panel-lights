@@ -72,7 +72,11 @@ Sequence loadSequence(const FileName fileName)
 
     fclose(fp);
 
+    // calculate complete sequence duration
+    sequence.calcDuration();
+    // mark sequence as usable by ui
     sequence.valid = true;
+    fprintf(stderr, "sequence %s duration %f s\n", fileName.name, sequence.duration);
     return sequence;
 }
 

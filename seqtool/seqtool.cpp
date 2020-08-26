@@ -144,7 +144,8 @@ int main(int, char**)
     FileList fileList;
     FileName fileName;
     Sequence sequence;
-//    char scratch[128];
+    bool playing = false;
+    float elapsedTime = 0;
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -228,36 +229,17 @@ int main(int, char**)
                         fprintf(stderr, "panel1: mode %d, color %06X | panel2: mode %d, color %06X | wait %d\n",
                                 step.mode1, step.color1, step.mode2, step.color2, step.wait);
                     }
+                    // reset playing
+                    playing = false;
+                    elapsedTime = 0;
                 }
             }
 
             if (sequence) {
-//                fprintf(stderr, "sequence size %d\n", sequence.count());
-                // create step widgets
-#if 0
-                ImGui::Text("step #");
-                ImGui::SameLine(60);
-                ImGui::Text("color 1");
-                ImGui::SameLine(120);
-                ImGui::Text("color 2");
-                ImGui::SameLine(280);
-                ImGui::Text("wait");
+                // sequence not valid
 
-                for (int n = 0; n < sequence.count(); n++) {
-                    Step *step = sequence.step(n);
-                    ImGui::PushID(n);
-                    ImGui::SetNextItemWidth(60);
-                    ImGui::Text("%3d", n+1);
-                    ImGui::SameLine(80);
-                    ImGui::ColorEdit3("color1", (float*)&step->color1Vec, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
-                    ImGui::SameLine(140);
-                    ImGui::ColorEdit3("color2", (float*)&step->color2Vec, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
-                    ImGui::SameLine(200);
-                    ImGui::SetNextItemWidth(200);
-                    ImGui::SliderFloat("", &step->waitf, 1.0f, 9.9f, "%.1f s");
-                    ImGui::PopID();
-                }
-#endif
+                // fprintf(stderr, "sequence size %d\n", sequence.count());
+                // create step widgets
                 ImGui::Text("List of steps");
                 ImGui::Columns(4, "listofsteps");
                 ImGui::SetColumnWidth(0, 60);
@@ -303,31 +285,24 @@ int main(int, char**)
                     ImGui::SameLine();
                     ImGui::Checkbox("##random 2", &step->random2);
                     ImGui::NextColumn();
-                    ImGui::SliderFloat("", &step->waitf, 1.0f, 9.9f, "%.1f s");
+                    if (ImGui::SliderFloat("", &step->waitf, 1.0f, 9.9f, "%.1f s")) {
+                        // value has changed, recalculate sequence duration
+                        sequence.calcDuration();
+                    }
                     ImGui::NextColumn();
                     ImGui::PopID();
                 }
                 ImGui::Columns(1);
                 ImGui::Separator();
 
-                static int playing = 0;
-                static double elapsedTime = 0;
-                static double sequenceTime = 0;
-
                 if (ImGui::Button("Play")) {
                     fprintf(stderr, "sequence play: Start\n");
-                    playing = 1;
+                    playing = true;
                     elapsedTime = 0;
-                    sequenceTime = 0;
-                    for (int n = 0; n < sequence.count(); n++) {
-                        Step *step = sequence.step(n);
-                        sequenceTime += step->waitf;
-                    }
                 }
                 if (ImGui::Button("Stop")) {
                     fprintf(stderr, "sequence play: Stop\n");
-                    playing = 0;
-                    sequenceTime = 0;
+                    playing = false;
                     elapsedTime = 0;
                 }
 
@@ -344,15 +319,19 @@ int main(int, char**)
                             break;
                         }
                     }
-                    ImGui::Text("Step # %d, elapsed time %f\n", stepIndex+1, elapsedTime);
+                    ImGui::Text("Step # %d, elapsed time %.2f / %.2f\n", stepIndex+1, elapsedTime, sequence.duration);
                     ImGui::ColorButton("###Panel 1", ImColor(step->color1), flags, ImVec2(100, 100));
                     ImGui::SameLine();
                     ImGui::ColorButton("###Panel 2", ImColor(step->color2), flags, ImVec2(100, 100));
-                    if (elapsedTime > sequenceTime) {
+                    if (elapsedTime > sequence.duration) {
                         elapsedTime = 0;
                         fprintf(stderr, "sequence play: Loop\n");
                     }
                 }
+            } else {
+                // sequence not valid
+                playing = false;
+                elapsedTime = 0;
             }
 
             ImGui::End();

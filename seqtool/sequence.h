@@ -89,11 +89,13 @@ struct Sequence {
     ImVector<Step> data;
     FileName fileName;
     bool valid;
+    float duration;
 
     Sequence() {
 //        data.reserve(1000);
 //        fileName = fileName_;
         valid = false;
+        duration = 0;
     }
     Sequence(FileName fileName_) {
         fileName = fileName_;
@@ -114,7 +116,13 @@ struct Sequence {
         assert(n >= 0 && n < data.size());
         return &data[n];
     }
-
+    void calcDuration() {
+        float duration_ = 0;
+        for (int n = 0; n < data.size(); n++) {
+            duration_ += data[n].waitf;
+        }
+        duration = duration_;
+    }
     operator bool() { return valid; }
 };
 
