@@ -113,6 +113,9 @@ struct Sequence {
     void addStep(Step s) {
         data.push_back(s);
     }
+    void delStep(Step *step) {
+        data.erase(step);
+    }
     void erase() {
         data.clear();
     }

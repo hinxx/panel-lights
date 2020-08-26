@@ -245,16 +245,18 @@ int main(int, char**)
                 // fprintf(stderr, "sequence size %d\n", sequence.count());
                 // create step widgets
                 ImGui::Text("List of steps");
-                ImGui::Columns(4, "listofsteps");
+                ImGui::Columns(5, "listofsteps");
                 ImGui::SetColumnWidth(0, 60);
                 ImGui::SetColumnWidth(1, 60);
                 ImGui::SetColumnWidth(2, 60);
                 ImGui::SetColumnWidth(3, 300);
+//                ImGui::SetColumnWidth(4, 100);
                 ImGui::Separator();
                 ImGui::Text("step #"); ImGui::NextColumn();
                 ImGui::Text("Color 1"); ImGui::NextColumn();
                 ImGui::Text("Color 2"); ImGui::NextColumn();
                 ImGui::Text("Wait"); ImGui::NextColumn();
+                ImGui::Text("Action"); ImGui::NextColumn();
                 ImGui::Separator();
                 for (int n = 0; n < sequence.count(); n++) {
                     ImGuiColorEditFlags flags1 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
@@ -292,20 +294,37 @@ int main(int, char**)
                         sequence.calcDuration();
                     }
                     ImGui::NextColumn();
+                    if (ImGui::Button("Remove step")) {
+                        fprintf(stderr, "sequence: Remove step\n");
+                        sequence.delStep(step);
+                        // sequence has a new step, recalculate sequence duration
+                        sequence.calcDuration();
+                    }
+                    ImGui::NextColumn();
                     ImGui::PopID();
                 }
                 ImGui::Separator();
+                // end multicolumn
+                ImGui::Columns(1);
+
+                // insert an empty row
+                ImGui::Dummy(ImVec2(10,10));
+
+                // start multicolumn again
+                ImGui::Columns(5, "listofsteps2");
+                ImGui::SetColumnWidth(0, 60);
+                ImGui::SetColumnWidth(1, 60);
+                ImGui::SetColumnWidth(2, 60);
+                ImGui::SetColumnWidth(3, 300);
+                ImGui::Separator();
 
                 // controls for adding a new step (append to sequence)
-                static Step newStep;
-                if (ImGui::Button("Add step")) {
-                    fprintf(stderr, "sequence: Add step\n");
-                    sequence.addStep(newStep);
-                    // sequence has a new step, recalculate sequence duration
-                    sequence.calcDuration();
-                }
                 static ImGuiColorEditFlags flags1 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
                 static ImGuiColorEditFlags flags2 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
+                static Step newStep;
+                static int newId = 9999;
+                ImGui::Text("%04d", newId);
+                //ImGui::InputInt("###new step id", &newId);
                 ImGui::NextColumn();
                 // in case of random color mode disable the color picker and grey out the button
                 if (newStep.random1) {
@@ -331,8 +350,16 @@ int main(int, char**)
                 ImGui::SameLine();
                 ImGui::Checkbox("##new random 2", &newStep.random2);
                 ImGui::NextColumn();
-                ImGui::SliderFloat("", &newStep.duration, 1.0f, 9.9f, "%.1f s");
+                ImGui::SliderFloat("###new duration", &newStep.duration, 1.0f, 9.9f, "%.1f s");
                 ImGui::NextColumn();
+                if (ImGui::Button("Add step")) {
+                    fprintf(stderr, "sequence: Add step\n");
+                    sequence.addStep(newStep);
+                    // sequence has a new step, recalculate sequence duration
+                    sequence.calcDuration();
+                }
+                ImGui::NextColumn();
+                // end multicolumn
                 ImGui::Columns(1);
                 ImGui::Separator();
 
