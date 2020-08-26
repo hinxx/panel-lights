@@ -106,9 +106,8 @@ It allows
  * removing a sequence
  * simulating sequence run
 
-The tool user interface is based on Dear ImGUI and can be used on any modern 
-operating system (OSX, Linux, Windows). 
- 
+The tool user interface is based on Dear ImGUI (https://github.com/ocornut/imgui)
+and can be used on any modern operating system (OSX, Linux, Windows). 
   
 # Bugs, improvements, features
 
