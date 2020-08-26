@@ -1,0 +1,12 @@
+*~
+*.swp
+*.o
+seqtool
+seqtool.cflags
+seqtool.config
+seqtool.creator
+seqtool.creator.user
+seqtool.cxxflags
+seqtool.files
+seqtool.includes
+
