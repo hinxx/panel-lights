@@ -9,5 +9,5 @@ seqtool.creator.user
 seqtool.cxxflags
 seqtool.files
 seqtool.includes
-imgui/ini
+imgui.ini
 
