@@ -146,6 +146,8 @@ int main(int, char**)
     Sequence sequence;
     bool playing = false;
     float elapsedTime = 0;
+    bool show_generator_window = true;
+    SequenceList sequences;
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -296,7 +298,7 @@ int main(int, char**)
                     ImGui::NextColumn();
                     if (ImGui::Button("Remove step")) {
                         fprintf(stderr, "sequence: Remove step\n");
-                        sequence.delStep(step);
+                        sequence.delStep(n);
                         // sequence has a new step, recalculate sequence duration
                         sequence.calcDuration();
                     }
@@ -408,6 +410,69 @@ int main(int, char**)
 
             ImGui::End();
         } // our sequence handling window
+
+        // pattern generator window
+        if (show_generator_window)
+        {
+            ImGui::Begin("Pattern Generator Window", &show_generator_window);
+            static int gen_num_steps = 1;
+            static bool gen_wait_steps = true;
+            static char gen_sequence_name[10] = {0};
+            ImGui::Text("Pattern generator number settings");
+            ImGui::InputText("Name of sequence", gen_sequence_name, 10);
+            ImGui::InputInt("Number of steps", &gen_num_steps);
+            ImGui::Checkbox("Add wait steps", &gen_wait_steps);
+
+            if (ImGui::Button("Generate")) {
+                fprintf(stderr, "generating pattern: %d steps\n", gen_num_steps);
+                Sequence newSequence(gen_sequence_name);
+                for (int n = 0; n < gen_num_steps; n++) {
+                    Step newStep = Step(0, 0x00FF0000, 0, 0x0000FFFF, 23);
+                    newSequence.addStep(newStep);
+                    if (gen_wait_steps) {
+                        Step newStep = Step(0, 0x00000000, 0, 0x00000000, 10);
+                        newSequence.addStep(newStep);
+                    }
+                }
+                sequences.addSequence(newSequence);
+            }
+
+            ImGui::End();
+        }
+
+        // sequence window
+        {
+            ImGui::Begin("Sequence Window");
+            ImGui::Text("Number of sequences: %d", sequences.count());
+            ImGui::Columns(2, "sequences");
+            ImGui::Separator();
+            ImGui::Text("Name"); ImGui::NextColumn();
+            ImGui::Text("Steps"); ImGui::NextColumn();
+            ImGui::Separator();
+            for (int n = 0; n < sequences.count(); n++) {
+                Sequence *seq = sequences.sequence(n);
+                if (ImGui::Selectable(seq->getName(), sequences.selectedIndex() == n, ImGuiSelectableFlags_SpanAllColumns)) {
+                    sequences.selectSequence(n);
+                    fprintf(stderr, "Selected sequence %s, number of steps %d\n", seq->getName(), seq->numSteps());
+                    for (int m = 0; m < seq->numSteps(); m++) {
+                        Step *step = seq->getStep(m);
+                        fprintf(stderr, "panel1: mode %d, color %06X | panel2: mode %d, color %06X | wait %f s\n",
+                                step->mode1,
+                                (unsigned int)ImColor(step->color1[0], step->color1[1], step->color1[2], .0f),
+                                step->mode2,
+                                (unsigned int)ImColor(step->color2[0], step->color2[1], step->color2[2], .0f),
+                                step->duration);
+                    }
+                }
+                ImGui::NextColumn();
+                ImGui::Text("%d", seq->numSteps());
+                ImGui::NextColumn();
+            }
+            ImGui::Columns(1);
+            ImGui::Separator();
+
+            ImGui::End();
+        }
 
         // Rendering
         ImGui::Render();

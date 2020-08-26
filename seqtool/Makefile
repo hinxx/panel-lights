@@ -25,8 +25,8 @@ OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
 UNAME_S := $(shell uname -s)
 
 CXXFLAGS = -I./
-#CXXFLAGS += -ggdb3 -O0 -Wall -Wformat
-CXXFLAGS += -O3 -Wall -Wformat
+CXXFLAGS += -ggdb3 -O0 -Wall -Wformat
+#CXXFLAGS += -O3 -Wall -Wformat
 
 LIBS =
 HDRS = $(wildcard *.h)

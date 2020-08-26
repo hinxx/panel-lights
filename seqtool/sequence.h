@@ -1,10 +1,22 @@
 #ifndef SEQUENCE_H
 #define SEQUENCE_H
 
+#include <vector>
+
 #include <string.h>
 #include <stdlib.h>
 
 #include "imgui.h"
+
+// XXX : start using ..
+#ifdef __GNUC__
+#define DEPRECATED(func) func __attribute__ ((deprecated))
+#elif defined(_MSC_VER)
+#define DEPRECATED(func) __declspec(deprecated) func
+#else
+#pragma message("WARNING: You need to implement DEPRECATED for this compiler")
+#define DEPRECATED(func) func
+#endif
 
 struct FileName {
     char path[32];
@@ -93,42 +105,60 @@ struct Step {
 };
 
 struct Sequence {
-    ImVector<Step> data;
+    std::vector<Step> data;
     FileName fileName;
     bool valid;
     float duration;
+    char name[16];
 
     Sequence() {
-//        data.reserve(1000);
-//        fileName = fileName_;
         valid = false;
         duration = 0;
+        memset(name, 0, 16);
     }
     Sequence(FileName fileName_) {
+        valid = false;
+        duration = 0;
+        memset(name, 0, 16);
         fileName = fileName_;
     }
-//    void addStep(ImVec4 c1, ImVec4 c2, double t) {
-//        addStep(Step(c1, c2, t));
-//    }
+    Sequence(const char *name_) {
+        valid = false;
+        duration = 0;
+        strncpy(name, name_, 16);
+    }
+    char *getName() {
+        return name;
+    }
+
     void addStep(Step s) {
         data.push_back(s);
     }
-    void delStep(Step *step) {
-        data.erase(step);
+    void delStep(size_t n) {
+        data.erase(data.begin()+n);
     }
     void erase() {
         data.clear();
     }
+    // DEPRECATED: use numSteps instead
     int count() {
         return data.size();
     }
-    Step *step(int n) {
+    // DEPRECATED: use getStep instead
+    Step *step(size_t n) {
+        assert(n >= 0 && n < data.size());
+        return &data[n];
+    }
+    int numSteps() {
+        return data.size();
+    }
+    Step *getStep(size_t n) {
         assert(n >= 0 && n < data.size());
         return &data[n];
     }
     void calcDuration() {
         float duration_ = 0;
-        for (int n = 0; n < data.size(); n++) {
+        for (size_t n = 0; n < data.size(); n++) {
             duration_ += data[n].duration;
         }
         duration = duration_;
@@ -136,6 +166,34 @@ struct Sequence {
     operator bool() { return valid; }
 };
 
+struct SequenceList {
+    std::vector<Sequence> data;
+    int selectedSequenceIndex = -1;
+
+    SequenceList() {
+    }
+    void addSequence(Sequence seq) {
+        data.push_back(seq);
+    }
+    int count() {
+        return data.size();
+    }
+    Sequence *sequence(size_t n) {
+        assert(n >= 0 && n < data.size());
+        return &data[n];
+    }
+    int selectedIndex() {
+        return selectedSequenceIndex;
+    }
+    void selectSequence(int index_) {
+        selectedSequenceIndex = index_;
+    }
+    Sequence *selectedSequence() {
+        if (selectedSequenceIndex == -1)
+            return NULL;
+        return &data[selectedSequenceIndex];
+    }
+};
 
 FileList loadFileList(const char *filePath);
 Sequence loadSequence(const FileName fileName);
