@@ -117,12 +117,14 @@ struct Sequence {
     float duration;
     char shortName[32];
     char fileName[32];
+    char description[256];
 
     Sequence() {
         valid = false;
         duration = 0;
         memset(shortName, 0, 32);
         memset(fileName, 0, 32);
+        memset(description, 0, 32);
     }
 //    Sequence(FileName fileName_) {
 //        valid = false;
@@ -133,23 +135,43 @@ struct Sequence {
     Sequence(const char *shortName_) {
         valid = false;
         duration = 0;
-        strncpy(shortName, shortName_, 32);
+        strncpy(shortName, shortName_, 31);
         memset(fileName, 0, 32);
+        memset(description, 0, 32);
     }
     Sequence(const char *shortName_, const char *fileName_) {
         valid = false;
         duration = 0;
-        strncpy(shortName, shortName_, 32);
-        strncpy(fileName, fileName_, 32);
+        strncpy(shortName, shortName_, 31);
+        strncpy(fileName, fileName_, 31);
+        memset(description, 0, 32);
     }
     void setShortName(const char *shortName_) {
-        strncpy(shortName, shortName_, 32);
+        strncpy(shortName, shortName_, 31);
     }
     const char *getShortName() {
         return shortName;
     }
     const char *getFileName() {
         return fileName;
+    }
+    void appendDescription(const char *description_) {
+        size_t n = strlen(description);
+        // check for overflow
+        if (n == 256)
+            return;
+        // append a space if there are characters present already
+        // need at least 2 characters left at this point
+        if ((n != 0) && (n < 254))
+            description[n++] = ' ';
+        // last index is reserved for '\0' terminator
+        if (n < 255)
+            strncpy(description + n, description_, 256 - n);
+        // make sure string is always '\0' terminated!
+        description[255] = '\0';
+    }
+    const char *getDescription() {
+        return description;
     }
 
     void addStep(Step s) {

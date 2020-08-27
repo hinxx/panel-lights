@@ -1,0 +1,8 @@
+# clipped sequence name if >31 characters name gets clipped..
+# complete short name was 'clipped sequence name if >31 characters name gets clipped..'
+# use maximum 31 characters for short name, use description for up to 255 characters
+# >> reason: who needs more that 640 kB!?!
+00 ff0000 00 0000ff 34
+00 000000 00 000000 55
+00 ff0000 00 00ff00 46
+00 000000 00 000000 15

@@ -38,7 +38,6 @@ Sequence loadSequence(const FileName *fileName)
         return Sequence();
     }
 
-//    int nread;
     char *p;
     bool hasShortName = false;
     // make short name same as filename for now; will be replaced if short name
@@ -46,9 +45,7 @@ Sequence loadSequence(const FileName *fileName)
     Sequence sequence(fileName->name, fileName->name);
 
     do {
-//        nread = fread(buf, 1, 128, fp);
         p = fgets(buf, 128, fp);
-//        if (nread == 0) {
         if (p == NULL) {
             if (ferror(fp)) {
                 // error occured
@@ -78,7 +75,6 @@ Sequence loadSequence(const FileName *fileName)
         // check if this is a comment line
         if (buf[0] == '#') {
             // first commented line is short sequence name
-            // TODO: other commented lines, before first data lines, are longer description
             if (hasShortName == false) {
                 char *s = buf;
                 char *e = &buf[nread - 1];
@@ -94,7 +90,26 @@ Sequence loadSequence(const FileName *fileName)
                 fprintf(stderr, "Extracted short name: '%s'\n", s);
                 sequence.setShortName(s);
                 hasShortName = true;
+            } else {
+                // other commented lines, before first data lines, are considered description
+                char *s = buf;
+                char *e = &buf[nread - 1];
+                while (e > s) {
+                    if (! isspace(*e)) break;
+                    e--;
+                }
+                *(e + 1) = '\0';
+                while (s <= e) {
+                    if ((! isblank(*s)) && ! (*s == '#')) break;
+                    s++;
+                }
+                fprintf(stderr, "Extracted description: '%s'\n", s);
+                // skip empty lines
+                if (strlen(s) > 0) {
+                    sequence.appendDescription(s);
+                }
             }
+
         } else {
             unsigned char mode1;
             unsigned int color1;

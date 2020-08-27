@@ -1,0 +1,11 @@
+# long desc 88
+#
+# First line starting with non '#' char is data line!
+#
+# Can have blank lines.. which will be skipped and ignored/not visible in UI.
+# This description will be too long and will be clipped when reaching 255 characters.
+# Clipping might have already happened, hence you are not seeing this text in the UI.. Sorry about that.
+# Are you sure you need to be so elaborate on with this description!?
+# data lines matter!
+00 ff0000 00 0000ff 34
+00 000000 00 000000 55

@@ -614,6 +614,15 @@ int main(int, char**)
             ImGui::Columns(1);
             ImGui::Separator();
 
+            // display the desription of the selected sequence
+            Sequence *selectedSeq = sequences.selectedSequence();
+            ImGui::Text("Selected sequence description:");
+            if (selectedSeq) {
+                ImGui::TextWrapped("%s", selectedSeq->getDescription());
+            } else {
+                ImGui::TextWrapped("Sequence not selected..");
+            }
+
             ImGui::End();
         }
 
