@@ -265,7 +265,7 @@ int main(int, char**)
                     ImGuiColorEditFlags flags2 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
                     Step *step = sequence.step(n);
                     ImGui::PushID(n);
-                    ImGui::Text("%04d", n+1);
+                    ImGui::Text("%04d", n + 1);
                     ImGui::NextColumn();
                     // in case of random color mode disable the color picker and grey out the button
                     if (step->random1) {
@@ -416,24 +416,124 @@ int main(int, char**)
         {
             ImGui::Begin("Pattern Generator Window", &show_generator_window);
             static int gen_num_steps = 1;
+            static float gen_step_duration= 1.0f;
+            static float gen_wait_duration = 1.0f;
             static bool gen_wait_steps = true;
             static char gen_sequence_name[10] = {0};
             ImGui::Text("Pattern generator number settings");
             ImGui::InputText("Name of sequence", gen_sequence_name, 10);
             ImGui::InputInt("Number of steps", &gen_num_steps);
+//            ImGui::InputFloat("Step duration", &gen_step_duration);
+            ImGui::SliderFloat("Step duration", &gen_step_duration, 1.0f, 9.9f, "%.1f s");
             ImGui::Checkbox("Add wait steps", &gen_wait_steps);
+            if (gen_wait_steps) {
+//                ImGui::InputFloat("Wait duration", &gen_wait_duration);
+                ImGui::SliderFloat("Wait duration", &gen_wait_duration, 1.0f, 9.9f, "%.1f s");
+            }
+
+            // Generate a default palette. The palette will persist and can be edited.
+            static bool saved_palette_init = true;
+            static ImVec4 saved_palette[32] = {};
+            static ImVec4 step_palette[8] = {};
+            if (saved_palette_init)
+            {
+                for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++)
+                {
+                    ImGui::ColorConvertHSVtoRGB(n / 31.0f, 0.8f, 0.8f,
+                        saved_palette[n].x, saved_palette[n].y, saved_palette[n].z);
+                    saved_palette[n].w = 1.0f; // Alpha
+                }
+                for (int n = 0; n < 8; n++)
+                {
+                    ImGui::ColorConvertHSVtoRGB(.0f, .0f, .0f,
+                        step_palette[n].x, step_palette[n].y, step_palette[n].z);
+                    step_palette[n].w = 1.0f; // Alpha
+                }
+                saved_palette_init = false;
+            }
+
+            static ImVec4 color = ImVec4(114.0f / 255.0f, 144.0f / 255.0f, 154.0f / 255.0f, 200.0f / 255.0f);
+
+            ImGui::BeginGroup(); // Lock X position
+            ImGui::Separator();
+            ImGui::Text("Palette");
+//            for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++)
+            for (int n = 0; n < 8; n++)
+            {
+                ImGui::PushID(n);
+                if ((n % 8) != 0)
+                    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.y);
+
+                ImGuiColorEditFlags palette_button_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
+//                if (ImGui::ColorButton("##palette", saved_palette[n], palette_button_flags, ImVec2(20, 20)))
+//                    color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w); // Preserve alpha!
+
+                ImGui::ColorButton("##newpalette", step_palette[n], palette_button_flags, ImVec2(20, 20));
+
+                // Allow user to drop colors into each palette entry. Note that ColorButton() is already a
+                // drag source by default, unless specifying the ImGuiColorEditFlags_NoDragDrop flag.
+                if (ImGui::BeginDragDropTarget())
+                {
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(IMGUI_PAYLOAD_TYPE_COLOR_3F))
+                        memcpy((float*)&step_palette[n], payload->Data, sizeof(float) * 3);
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(IMGUI_PAYLOAD_TYPE_COLOR_4F))
+                        memcpy((float*)&step_palette[n], payload->Data, sizeof(float) * 4);
+                    ImGui::EndDragDropTarget();
+                }
+
+                ImGui::PopID();
+            }
+            ImGui::EndGroup();
+
+            ImGui::SameLine(0.0f, 30.0f/*ImGui::GetStyle().ItemSpacing.y*/);
+
+            ImGui::BeginGroup(); // Lock X position
+            ImGui::Separator();
+            ImGui::Text("Palette");
+            for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++)
+            {
+                ImGui::PushID(n);
+                if ((n % 8) != 0)
+                    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.y);
+
+                ImGuiColorEditFlags palette_button_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
+                if (ImGui::ColorButton("##palette", saved_palette[n], palette_button_flags, ImVec2(20, 20)))
+                    color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w); // Preserve alpha!
+
+                // Allow user to drop colors into each palette entry. Note that ColorButton() is already a
+                // drag source by default, unless specifying the ImGuiColorEditFlags_NoDragDrop flag.
+//                if (ImGui::BeginDragDropTarget())
+//                {
+//                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(IMGUI_PAYLOAD_TYPE_COLOR_3F))
+//                        memcpy((float*)&saved_palette[n], payload->Data, sizeof(float) * 3);
+//                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(IMGUI_PAYLOAD_TYPE_COLOR_4F))
+//                        memcpy((float*)&saved_palette[n], payload->Data, sizeof(float) * 4);
+//                    ImGui::EndDragDropTarget();
+//                }
+
+                ImGui::PopID();
+            }
+            ImGui::EndGroup();
 
             if (ImGui::Button("Generate")) {
                 fprintf(stderr, "generating pattern: %d steps\n", gen_num_steps);
                 Sequence newSequence(gen_sequence_name);
+                int step_index = 0;
                 for (int n = 0; n < gen_num_steps; n++) {
-                    Step newStep = Step(0, 0x00FF0000, 0, 0x0000FFFF, 23);
+//                    Step newStep = Step(0, 0x00FF0000, 0, 0x0000FFFF, 23);
+                    // take a user defined color
+                    step_index = n % 8;
+                    unsigned int c1 = ImColor(step_palette[step_index]);
+                    unsigned char d1 = (unsigned char)(gen_step_duration * 10);
+                    Step newStep = Step(0, c1, 0, c1, d1);
                     newSequence.addStep(newStep);
                     if (gen_wait_steps) {
-                        Step newStep = Step(0, 0x00000000, 0, 0x00000000, 10);
+                        unsigned char d2 = (unsigned char)(gen_wait_duration * 10);
+                        Step newStep = Step(0, 0x00000000, 0, 0x00000000, d2);
                         newSequence.addStep(newStep);
                     }
                 }
+                newSequence.calcDuration();
                 sequences.addSequence(newSequence);
             }
 
@@ -444,12 +544,17 @@ int main(int, char**)
         {
             ImGui::Begin("Sequence Window");
             ImGui::Text("Number of sequences: %d", sequences.count());
-            ImGui::Columns(2, "sequences");
+            ImGui::Columns(4, "sequences");
             ImGui::Separator();
+            ImGui::Text("ID"); ImGui::NextColumn();
             ImGui::Text("Name"); ImGui::NextColumn();
             ImGui::Text("Steps"); ImGui::NextColumn();
+            ImGui::Text("Duration"); ImGui::NextColumn();
             ImGui::Separator();
             for (int n = 0; n < sequences.count(); n++) {
+                ImGui::PushID(n);
+                ImGui::Text("%04d", n + 1);
+                ImGui::NextColumn();
                 Sequence *seq = sequences.sequence(n);
                 if (ImGui::Selectable(seq->getName(), sequences.selectedIndex() == n, ImGuiSelectableFlags_SpanAllColumns)) {
                     sequences.selectSequence(n);
@@ -467,7 +572,11 @@ int main(int, char**)
                 ImGui::NextColumn();
                 ImGui::Text("%d", seq->numSteps());
                 ImGui::NextColumn();
+                ImGui::Text("%.2f s", seq->duration);
+                ImGui::NextColumn();
+                ImGui::PopID();
             }
+
             ImGui::Columns(1);
             ImGui::Separator();
 
