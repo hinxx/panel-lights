@@ -141,10 +141,10 @@ int main(int, char**)
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     char filePathStr[256] = "./sdcard";
-    FileList fileList;
-    FileName fileName;
-    Sequence sequence;
-    bool playing = false;
+//    FileList fileList;
+//    FileName fileName;
+//    Sequence sequence;
+//    bool playing = false;
     float elapsedTime = 0;
     bool show_generator_window = true;
     SequenceList sequences;
@@ -203,7 +203,7 @@ int main(int, char**)
 
         // our sequence handling window
         {
-            ImGui::Begin("Panel Lights Sequence manipulator");
+            ImGui::Begin("Sequence editor");
 #if 0
             // file path input field
             // XXX: replace with file picker at some point in time!
@@ -241,6 +241,7 @@ int main(int, char**)
                 }
             }
 #endif
+            Sequence *sequence = sequences.selectedSequence();
             if (sequence) {
                 // sequence not valid
 
@@ -260,10 +261,10 @@ int main(int, char**)
                 ImGui::Text("Wait"); ImGui::NextColumn();
                 ImGui::Text("Action"); ImGui::NextColumn();
                 ImGui::Separator();
-                for (int n = 0; n < sequence.count(); n++) {
+                for (int n = 0; n < sequence->numSteps(); n++) {
                     ImGuiColorEditFlags flags1 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
                     ImGuiColorEditFlags flags2 = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel;
-                    Step *step = sequence.step(n);
+                    Step *step = sequence->getStep(n);
                     ImGui::PushID(n);
                     ImGui::Text("%04d", n + 1);
                     ImGui::NextColumn();
@@ -293,14 +294,14 @@ int main(int, char**)
                     ImGui::NextColumn();
                     if (ImGui::SliderFloat("", &step->duration, 1.0f, 9.9f, "%.1f s")) {
                         // value has changed, recalculate sequence duration
-                        sequence.calcDuration();
+                        sequence->calcDuration();
                     }
                     ImGui::NextColumn();
                     if (ImGui::Button("Remove step")) {
                         fprintf(stderr, "sequence: Remove step\n");
-                        sequence.delStep(n);
+                        sequence->delStep(n);
                         // sequence has a new step, recalculate sequence duration
-                        sequence.calcDuration();
+                        sequence->calcDuration();
                     }
                     ImGui::NextColumn();
                     ImGui::PopID();
@@ -356,65 +357,78 @@ int main(int, char**)
                 ImGui::NextColumn();
                 if (ImGui::Button("Add step")) {
                     fprintf(stderr, "sequence: Add step\n");
-                    sequence.addStep(newStep);
+                    sequence->addStep(newStep);
                     // sequence has a new step, recalculate sequence duration
-                    sequence.calcDuration();
+                    sequence->calcDuration();
                 }
                 ImGui::NextColumn();
                 // end multicolumn
                 ImGui::Columns(1);
                 ImGui::Separator();
 
+                // insert an empty row
+                ImGui::Dummy(ImVec2(10,10));
+                ImGui::Text("Playback control");
                 // sequence play/stop controls
-                if (ImGui::Button("Play")) {
+                if (ImGui::Button("Start")) {
                     fprintf(stderr, "sequence play: Start\n");
-                    playing = true;
+//                    playing = true;
+                    sequence->startRun();
                     elapsedTime = 0;
                 }
                 ImGui::SameLine(0, 20);
                 if (ImGui::Button("Stop")) {
                     fprintf(stderr, "sequence play: Stop\n");
-                    playing = false;
+//                    playing = false;
+                    sequence->stopRun();
                     elapsedTime = 0;
                 }
+                ImGui::SameLine(0, 20);
+                if (ImGui::Button("Restart")) {
+                    fprintf(stderr, "sequence play: Restart\n");
+//                    playing = false;
+                    sequence->stopRun();
+                    elapsedTime = 0;
+                    sequence->startRun();
+                }
 
-                if (playing) {
+                if (sequence->isRunning()) {
                     ImGuiColorEditFlags flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop;
                     elapsedTime += ImGuiIO().DeltaTime;
                     double runTime = 0;
                     Step *step = NULL;
                     int stepIndex = 0;
-                    for (stepIndex = 0; stepIndex < sequence.count(); stepIndex++) {
-                        step = sequence.step(stepIndex);
+                    for (stepIndex = 0; stepIndex < sequence->numSteps(); stepIndex++) {
+                        step = sequence->getStep(stepIndex);
                         runTime += step->duration;
                         if (elapsedTime < runTime) {
                             break;
                         }
                     }
-                    ImGui::Text("Step # %d, elapsed time %.2f / %.2f\n", stepIndex+1, elapsedTime, sequence.duration);
+                    ImGui::Text("Step # %d, elapsed time %.2f / %.2f\n", stepIndex+1, elapsedTime, sequence->getDuration());
                     ImVec4 color1 = ImColor(step->color1[0], step->color1[1], step->color1[2]);
-                    ImGui::ColorButton("###Panel 1", color1, flags, ImVec2(100, 100));
+                    ImGui::ColorButton("###Panel 1", color1, flags, ImVec2(200, 200));
                     ImGui::SameLine();
                     ImVec4 color2 = ImColor(step->color2[0], step->color2[1], step->color2[2]);
-                    ImGui::ColorButton("###Panel 2", color2, flags, ImVec2(100, 100));
-                    if (elapsedTime > sequence.duration) {
+                    ImGui::ColorButton("###Panel 2", color2, flags, ImVec2(200, 200));
+                    if (elapsedTime > sequence->getDuration()) {
                         elapsedTime = 0;
                         fprintf(stderr, "sequence play: Loop\n");
                     }
                 }
             } else {
                 // sequence not valid
-                playing = false;
+//                playing = false;
                 elapsedTime = 0;
             }
 
             ImGui::End();
-        } // our sequence handling window
+        } // our sequence editor window
 
-        // pattern generator window
+        // sequence generator window
         if (show_generator_window)
         {
-            ImGui::Begin("Pattern Generator Window", &show_generator_window);
+            ImGui::Begin("Sequence generator", &show_generator_window);
             static int gen_num_steps = 1;
             static float gen_step_duration= 1.0f;
             static float gen_wait_duration = 1.0f;
@@ -549,7 +563,7 @@ int main(int, char**)
 
         // sequence window
         {
-            ImGui::Begin("Sequence Window");
+            ImGui::Begin("Sequence list");
 
             // file path input field
             // XXX: replace with file picker at some point in time!
@@ -558,7 +572,7 @@ int main(int, char**)
 
             // load sequences from files in file path
             if (ImGui::Button("Load Files")) {
-                fileList = loadFileList(filePathStr);
+                FileList fileList = loadFileList(filePathStr);
                 fprintf(stderr, "file list size %d\n", fileList.count());
                 for (int n = 0; n < fileList.count(); n++) {
                     // load the file contents

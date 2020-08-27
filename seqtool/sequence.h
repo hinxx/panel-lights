@@ -118,6 +118,7 @@ struct Sequence {
     char shortName[32];
     char fileName[32];
     char description[256];
+    bool running;
 
     Sequence() {
         valid = false;
@@ -125,6 +126,7 @@ struct Sequence {
         memset(shortName, 0, 32);
         memset(fileName, 0, 32);
         memset(description, 0, 32);
+        running = false;
     }
 //    Sequence(FileName fileName_) {
 //        valid = false;
@@ -138,6 +140,7 @@ struct Sequence {
         strncpy(shortName, shortName_, 31);
         memset(fileName, 0, 32);
         memset(description, 0, 32);
+        running = false;
     }
     Sequence(const char *shortName_, const char *fileName_) {
         valid = false;
@@ -145,6 +148,7 @@ struct Sequence {
         strncpy(shortName, shortName_, 31);
         strncpy(fileName, fileName_, 31);
         memset(description, 0, 32);
+        running = false;
     }
     void setShortName(const char *shortName_) {
         strncpy(shortName, shortName_, 31);
@@ -180,18 +184,18 @@ struct Sequence {
     void delStep(size_t n) {
         data.erase(data.begin()+n);
     }
-    void erase() {
-        data.clear();
-    }
+//    void erase() {
+//        data.clear();
+//    }
     // DEPRECATED: use numSteps instead
-    int count() {
-        return data.size();
-    }
+//    int count() {
+//        return data.size();
+//    }
     // DEPRECATED: use getStep instead
-    Step *step(size_t n) {
-        assert(n >= 0 && n < data.size());
-        return &data[n];
-    }
+//    Step *step(size_t n) {
+//        assert(n >= 0 && n < data.size());
+//        return &data[n];
+//    }
     int numSteps() {
         return data.size();
     }
@@ -206,7 +210,22 @@ struct Sequence {
         }
         duration = duration_;
     }
-    operator bool() { return valid; }
+    float getDuration() {
+        return duration;
+    }
+
+    void stopRun() {
+        running = false;
+    }
+    void startRun() {
+        running = true;
+    }
+    bool isRunning() {
+        return running;
+    }
+
+//    operator bool() { return valid; }
+
 };
 
 struct SequenceList {
@@ -229,7 +248,11 @@ struct SequenceList {
         return selectedSequenceIndex;
     }
     void selectSequence(int index_) {
+        for (size_t n = 0; n < data.size(); n++) {
+            sequence(n)->stopRun();
+        }
         selectedSequenceIndex = index_;
+//        sequence(selectedSequenceIndex)->startRun();
     }
     Sequence *selectedSequence() {
         if (selectedSequenceIndex == -1)
