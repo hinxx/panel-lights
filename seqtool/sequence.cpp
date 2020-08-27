@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include "sequence.h"
 
@@ -22,14 +23,13 @@ FileList loadFileList(const char *filePath)
     return fileList;
 }
 
-Sequence loadSequence(const FileName fileName)
+Sequence loadSequence(const FileName *fileName)
 {
-    fprintf(stderr, "User supplied file name: '%s'\n", fileName.name);
+    fprintf(stderr, "User supplied file name: '%s'\n", fileName->name);
 
-    Sequence sequence(fileName);
 //    sequence.loadFromFile(fileName);
     char buf[128];
-    sprintf(buf, "%s/%s", fileName.path, fileName.name);
+    sprintf(buf, "%s/%s", fileName->path, fileName->name);
     fprintf(stderr, "opening %s ..\n", buf);
     FILE *fp = fopen(buf, "r");
     assert(fp != NULL);
@@ -38,8 +38,13 @@ Sequence loadSequence(const FileName fileName)
         return Sequence();
     }
 
-    int nread;
+//    int nread;
     char *p;
+    bool hasShortName = false;
+    // make short name same as filename for now; will be replaced if short name
+    // is found in the file while parsing
+    Sequence sequence(fileName->name, fileName->name);
+
     do {
 //        nread = fread(buf, 1, 128, fp);
         p = fgets(buf, 128, fp);
@@ -58,15 +63,51 @@ Sequence loadSequence(const FileName fileName)
                 assert(errno != errno);
             }
         }
-        nread = strlen(buf);
+
+        // nread will hold the newline char as well
+        int nread = strlen(buf);
         fprintf(stderr, "line: nbytes %d: '%s'\n", nread, buf);
-        unsigned char mode1;
-        unsigned int color1;
-        unsigned char mode2;
-        unsigned int color2;
-        unsigned char wait;
-        sscanf(buf, "%hhX %X %hhX %X %hhu", &mode1, &color1, &mode2, &color2, &wait);
-        sequence.addStep(Step(mode1, color1, mode2, color2, wait));
+        // empty line??! ; this can happen here (fgets() will set p to NULL above and that is handled)
+//        if (nread == 0) {
+//            continue;
+//        }
+        // line with newline only?
+        if ((buf[0] == '\n') || ((nread > 1) && (buf[0] == '\r') && (buf[1] == '\n'))) {
+            continue;
+        }
+        // check if this is a comment line
+        if (buf[0] == '#') {
+            // first commented line is short sequence name
+            // TODO: other commented lines, before first data lines, are longer description
+            if (hasShortName == false) {
+                char *s = buf;
+                char *e = &buf[nread - 1];
+                while (e > s) {
+                    if (! isspace(*e)) break;
+                    e--;
+                }
+                *(e + 1) = '\0';
+                while (s < e) {
+                    if ((! isblank(*s)) && ! (*s == '#')) break;
+                    s++;
+                }
+                fprintf(stderr, "Extracted short name: '%s'\n", s);
+                sequence.setShortName(s);
+                hasShortName = true;
+            }
+        } else {
+            unsigned char mode1;
+            unsigned int color1;
+            unsigned char mode2;
+            unsigned int color2;
+            unsigned char wait;
+            int nconv = sscanf(buf, "%hhX %X %hhX %X %hhu", &mode1, &color1, &mode2, &color2, &wait);
+            if (nconv != 5) {
+                fprintf(stderr, "data line invalid! nconv %d, buf: '%s'\n", nconv, buf);
+                assert(nconv == 5);
+            }
+            sequence.addStep(Step(mode1, color1, mode2, color2, wait));
+        }
 
     } while (!feof(fp));
 
@@ -76,7 +117,7 @@ Sequence loadSequence(const FileName fileName)
     sequence.calcDuration();
     // mark sequence as usable by ui
     sequence.valid = true;
-    fprintf(stderr, "sequence %s duration %f s\n", fileName.name, sequence.duration);
+    fprintf(stderr, "sequence %s duration %f s\n", sequence.getShortName(), sequence.duration);
     return sequence;
 }
 

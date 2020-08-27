@@ -45,7 +45,8 @@ struct FileName {
 };
 
 struct FileList {
-    ImVector<FileName> data;
+//    ImVector<FileName> data;
+    std::vector<FileName> data;
     int sel;
 
     FileList() {
@@ -55,20 +56,25 @@ struct FileList {
     void add(const char *path_, const char *name_) {
         data.push_back(FileName(path_, name_));
     }
+    // DEPRECATED: do not use
     void erase() {
         data.clear();
     }
     int count() {
         return data.size();
     }
-    int selected() {
-        return sel;
-    }
-    void select(int sel_) {
-        sel = sel_;
-    }
-    FileName selectedFileName() {
-        return data[sel];
+//    int selected() {
+//        return sel;
+//    }
+//    void select(int sel_) {
+//        sel = sel_;
+//    }
+//    FileName selectedFileName() {
+//        return data[sel];
+//    }
+    FileName *getFileName(size_t n) {
+        assert(n >= 0 && n < data.size());
+        return &data[n];
     }
 };
 
@@ -106,29 +112,44 @@ struct Step {
 
 struct Sequence {
     std::vector<Step> data;
-    FileName fileName;
+//    FileName fileName;
     bool valid;
     float duration;
-    char name[16];
+    char shortName[32];
+    char fileName[32];
 
     Sequence() {
         valid = false;
         duration = 0;
-        memset(name, 0, 16);
+        memset(shortName, 0, 32);
+        memset(fileName, 0, 32);
     }
-    Sequence(FileName fileName_) {
+//    Sequence(FileName fileName_) {
+//        valid = false;
+//        duration = 0;
+//        memset(name, 0, 32);
+//        fileName = fileName_;
+//    }
+    Sequence(const char *shortName_) {
         valid = false;
         duration = 0;
-        memset(name, 0, 16);
-        fileName = fileName_;
+        strncpy(shortName, shortName_, 32);
+        memset(fileName, 0, 32);
     }
-    Sequence(const char *name_) {
+    Sequence(const char *shortName_, const char *fileName_) {
         valid = false;
         duration = 0;
-        strncpy(name, name_, 16);
+        strncpy(shortName, shortName_, 32);
+        strncpy(fileName, fileName_, 32);
     }
-    char *getName() {
-        return name;
+    void setShortName(const char *shortName_) {
+        strncpy(shortName, shortName_, 32);
+    }
+    const char *getShortName() {
+        return shortName;
+    }
+    const char *getFileName() {
+        return fileName;
     }
 
     void addStep(Step s) {
@@ -193,9 +214,17 @@ struct SequenceList {
             return NULL;
         return &data[selectedSequenceIndex];
     }
+    bool exists(const char *name) {
+        for (size_t n = 0; n < data.size(); n++) {
+            if (strncmp(sequence(n)->getShortName(), name, strlen(name)) == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 FileList loadFileList(const char *filePath);
-Sequence loadSequence(const FileName fileName);
+Sequence loadSequence(const FileName *fileName);
 
 #endif // SEQUENCE_H

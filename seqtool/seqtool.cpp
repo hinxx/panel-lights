@@ -204,7 +204,7 @@ int main(int, char**)
         // our sequence handling window
         {
             ImGui::Begin("Panel Lights Sequence manipulator");
-
+#if 0
             // file path input field
             // XXX: replace with file picker at some point in time!
             // XXX: make sure it works on all OSes..
@@ -240,7 +240,7 @@ int main(int, char**)
                     elapsedTime = 0;
                 }
             }
-
+#endif
             if (sequence) {
                 // sequence not valid
 
@@ -419,9 +419,9 @@ int main(int, char**)
             static float gen_step_duration= 1.0f;
             static float gen_wait_duration = 1.0f;
             static bool gen_wait_steps = true;
-            static char gen_sequence_name[10] = {0};
+            static char gen_sequence_name[32] = {0};
             ImGui::Text("Pattern generator number settings");
-            ImGui::InputText("Name of sequence", gen_sequence_name, 10);
+            ImGui::InputText("Name of sequence", gen_sequence_name, 32);
             ImGui::InputInt("Number of steps", &gen_num_steps);
 //            ImGui::InputFloat("Step duration", &gen_step_duration);
             ImGui::SliderFloat("Step duration", &gen_step_duration, 1.0f, 9.9f, "%.1f s");
@@ -516,25 +516,28 @@ int main(int, char**)
             ImGui::EndGroup();
 
             if (ImGui::Button("Generate")) {
-                fprintf(stderr, "generating pattern: %d steps\n", gen_num_steps);
-                Sequence newSequence(gen_sequence_name);
-                int step_index = 0;
-                for (int n = 0; n < gen_num_steps; n++) {
-//                    Step newStep = Step(0, 0x00FF0000, 0, 0x0000FFFF, 23);
-                    // take a user defined color
-                    step_index = n % 8;
-                    unsigned int c1 = ImColor(step_palette[step_index]);
-                    unsigned char d1 = (unsigned char)(gen_step_duration * 10);
-                    Step newStep = Step(0, c1, 0, c1, d1);
-                    newSequence.addStep(newStep);
-                    if (gen_wait_steps) {
-                        unsigned char d2 = (unsigned char)(gen_wait_duration * 10);
-                        Step newStep = Step(0, 0x00000000, 0, 0x00000000, d2);
+                if (strlen(gen_sequence_name) == 0) {
+                    fprintf(stderr, "generating pattern: missing name !\n");
+                } else {
+                    fprintf(stderr, "generating pattern: name '%s', steps %d\n", gen_sequence_name, gen_num_steps);
+                    Sequence newSequence(gen_sequence_name);
+                    int step_index = 0;
+                    for (int n = 0; n < gen_num_steps; n++) {
+                        // take a user defined color
+                        step_index = n % 8;
+                        unsigned int c1 = ImColor(step_palette[step_index]);
+                        unsigned char d1 = (unsigned char)(gen_step_duration * 10);
+                        Step newStep = Step(0, c1, 0, c1, d1);
                         newSequence.addStep(newStep);
+                        if (gen_wait_steps) {
+                            unsigned char d2 = (unsigned char)(gen_wait_duration * 10);
+                            Step newStep = Step(0, 0x00000000, 0, 0x00000000, d2);
+                            newSequence.addStep(newStep);
+                        }
                     }
+                    newSequence.calcDuration();
+                    sequences.addSequence(newSequence);
                 }
-                newSequence.calcDuration();
-                sequences.addSequence(newSequence);
             }
 
             ImGui::End();
@@ -543,22 +546,49 @@ int main(int, char**)
         // sequence window
         {
             ImGui::Begin("Sequence Window");
+
+            // file path input field
+            // XXX: replace with file picker at some point in time!
+            // XXX: make sure it works on all OSes..
+            ImGui::InputText("File Path", filePathStr, 256);
+
+            // load sequences from files in file path
+            if (ImGui::Button("Load Files")) {
+                fileList = loadFileList(filePathStr);
+                fprintf(stderr, "file list size %d\n", fileList.count());
+                for (int n = 0; n < fileList.count(); n++) {
+                    // load the file contents
+                    FileName *fn = fileList.getFileName(n);
+                    Sequence newSequence = loadSequence(fn);
+                    newSequence.calcDuration();
+                    if (! sequences.exists(newSequence.getShortName())) {
+                        fprintf(stderr, "adding loaded sequence %s..\n", newSequence.getShortName());
+                        sequences.addSequence(newSequence);
+                    } else {
+                        fprintf(stderr, "not adding sequence, already exists %s..\n", newSequence.getShortName());
+                    }
+//                    playing = false;
+//                    elapsedTime = 0;
+                }
+            }
+
             ImGui::Text("Number of sequences: %d", sequences.count());
-            ImGui::Columns(4, "sequences");
+            ImGui::Columns(5, "sequences");
             ImGui::Separator();
             ImGui::Text("ID"); ImGui::NextColumn();
             ImGui::Text("Name"); ImGui::NextColumn();
             ImGui::Text("Steps"); ImGui::NextColumn();
             ImGui::Text("Duration"); ImGui::NextColumn();
+            ImGui::Text("File Name"); ImGui::NextColumn();
             ImGui::Separator();
             for (int n = 0; n < sequences.count(); n++) {
-                ImGui::PushID(n);
-                ImGui::Text("%04d", n + 1);
-                ImGui::NextColumn();
                 Sequence *seq = sequences.sequence(n);
-                if (ImGui::Selectable(seq->getName(), sequences.selectedIndex() == n, ImGuiSelectableFlags_SpanAllColumns)) {
+                ImGui::PushID(n);
+                char label[32];
+                sprintf(label, "%04d", n + 1);
+                if (ImGui::Selectable(label, sequences.selectedIndex() == n, ImGuiSelectableFlags_SpanAllColumns)) {
                     sequences.selectSequence(n);
-                    fprintf(stderr, "Selected sequence %s, number of steps %d\n", seq->getName(), seq->numSteps());
+                    fprintf(stderr, "Selected sequence %s, number of steps %d\n", seq->getShortName(), seq->numSteps());
                     for (int m = 0; m < seq->numSteps(); m++) {
                         Step *step = seq->getStep(m);
                         fprintf(stderr, "panel1: mode %d, color %06X | panel2: mode %d, color %06X | wait %f s\n",
@@ -570,9 +600,13 @@ int main(int, char**)
                     }
                 }
                 ImGui::NextColumn();
+                ImGui::Text("%s", seq->getShortName());
+                ImGui::NextColumn();
                 ImGui::Text("%d", seq->numSteps());
                 ImGui::NextColumn();
                 ImGui::Text("%.2f s", seq->duration);
+                ImGui::NextColumn();
+                ImGui::Text("%s", seq->getFileName());
                 ImGui::NextColumn();
                 ImGui::PopID();
             }

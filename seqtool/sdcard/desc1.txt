@@ -1,0 +1,8 @@
+# seq name 45
+# This a sequence description that will be a long text used to
+# describe the sequence in more detail.
+#
+# Can span several lines..
+# First line starting with non '#' char is data line!
+00 ff0000 00 0000ff 34
+00 000000 00 000000 55
