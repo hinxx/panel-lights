@@ -420,8 +420,9 @@ int main(int, char**)
             static float gen_wait_duration = 1.0f;
             static bool gen_wait_steps = true;
             static char gen_sequence_name[32] = {0};
+            static char gen_sequence_desc[256] = {0};
             ImGui::Text("Pattern generator number settings");
-            ImGui::InputText("Name of sequence", gen_sequence_name, 32);
+            ImGui::InputText("Name of sequence (31 char max)", gen_sequence_name, 32);
             ImGui::InputInt("Number of steps", &gen_num_steps);
 //            ImGui::InputFloat("Step duration", &gen_step_duration);
             ImGui::SliderFloat("Step duration", &gen_step_duration, 1.0f, 9.9f, "%.1f s");
@@ -430,6 +431,8 @@ int main(int, char**)
 //                ImGui::InputFloat("Wait duration", &gen_wait_duration);
                 ImGui::SliderFloat("Wait duration", &gen_wait_duration, 1.0f, 9.9f, "%.1f s");
             }
+            ImGui::Text("Description (255 char max)");
+            ImGui::InputTextMultiline("##description", gen_sequence_desc, IM_ARRAYSIZE(gen_sequence_desc), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 8));
 
             // Generate a default palette. The palette will persist and can be edited.
             static bool saved_palette_init = true;
@@ -521,6 +524,7 @@ int main(int, char**)
                 } else {
                     fprintf(stderr, "generating pattern: name '%s', steps %d\n", gen_sequence_name, gen_num_steps);
                     Sequence newSequence(gen_sequence_name);
+                    newSequence.appendDescription(gen_sequence_desc);
                     int step_index = 0;
                     for (int n = 0; n < gen_num_steps; n++) {
                         // take a user defined color
