@@ -57,6 +57,7 @@ uint8_t pinMask;
 uint32_t t_f;
 uint8_t           brightness; ///< Strip brightness 0-255 (stored as +1)
 
+uint8_t mode1, mode2;
 uint32_t color1, color2;
 uint32_t timeMillis, timeDelay;
 char buff[32];
@@ -66,7 +67,21 @@ char filenames[5][13];
 File root;
 int nrFiles = 0;
 File dataFile;
-uint8_t fsmState = 0;
+
+// FSM defines
+enum {
+  fsmIdle = 0,
+  fsmFileSelect,
+  fsmFileOpen,
+  fsmHandleNameLine,
+  fsmHandleDescriptionLine,
+  fsmHandleDataLine,
+  fsmSequenceRun,
+  fsmSequenceStop,
+};
+
+uint8_t fsmState = fsmIdle;
+uint8_t readNextLine = 0;
 
 // the interrupt service routine affects this
 volatile bool encoderRotated = false;
@@ -519,7 +534,7 @@ void setBrightness(uint8_t b) {
 void setup() {
   // init the variables early
   memset(filenames, 0, sizeof(filenames));
-  fsmState = 0;
+  fsmState = fsmIdle;
   counter = 0;
   previousCounter = -1;
   brightness = 0;
@@ -546,7 +561,7 @@ void setup() {
   // Setup Serial Monitor
   Serial.begin (115200);
   while (!Serial) {}
-  Serial.println("panel lights v0.7");
+  Serial.println("panel lights v0.8");
   
   // clear the display
 //  timeMillis= millis();/
@@ -554,7 +569,7 @@ void setup() {
 //  timeMillis= millis() - timeMillis;/
 //  Serial.print("OLED clear took ");/
   Serial.println(timeMillis, DEC);
-  oledDrawText(0, 0, "panel lights v0.7", RED);
+  oledDrawText(0, 0, "panel lights v0.8", RED);
 
   if (! SD.begin(SDCS_PIN)) {
     Serial.println("SD init failed!");
@@ -641,7 +656,6 @@ void loop() {
   buttonState = digitalRead(inputSW);
   if (buttonState != previousStateSW) {
     Serial.print("SW button: "); Serial.println(buttonState ? "UP" : "DOWN");
-//    sprintf(buff, "Button %s", buttonStat/e ? "OFF" : "ON");
     sprintf(buff, "%s", buttonState ? "UP" : "DOWN");
     oled.fillRect(42, 30, 24, 10, BLACK);
     oledDrawText(42, 30, buff, YELLOW);
@@ -650,18 +664,23 @@ void loop() {
       // button was released
       digitalWrite(LED_BUILTIN, LOW);
       
-      if (fsmState == 0) {
+      if (fsmState == fsmIdle) {
         // in the main menu, button pressed to select a file
         // move to next state
-        fsmState = 1;
-      } else if ((fsmState == 2) || (fsmState == 3)) {
+        fsmState = fsmFileSelect;
+      } else if ((fsmState == fsmFileSelect) ||
+                  (fsmState == fsmFileOpen) ||
+                  (fsmState == fsmHandleNameLine) ||
+                  (fsmState == fsmHandleDescriptionLine) ||
+                  (fsmState == fsmHandleDataLine) ||
+                  (fsmState == fsmSequenceRun)) {
         // in the main menu, button pressed to stop current run
         // move to next state
-        fsmState = 4;
+        fsmState = fsmSequenceStop;
       } else {
         // unknown fsmState
         // error: move to intial state
-        fsmState = 0;
+        fsmState = fsmIdle;
       }
       
     } else {
@@ -672,9 +691,45 @@ void loop() {
   // Update previousStateSW with the current state
   previousStateSW = buttonState;
 
+  // if dataFile is opened and readNextLine is set
+  // read a line from file into buffer
+  if (dataFile && readNextLine) {
+    if (dataFile.peek() == -1) {
+      Serial.println("EOF.. rewind!");
+      // go to start of the file
+      dataFile.seek(0);
+    }
+    // get the line of text into the buffer
+    buffLen = dataFile.readBytesUntil('\n', buff, 31);
+    if (buffLen > 0) {
+      // terminate the string
+      buff[buffLen] = '\0';
+
+      // check the first character of the buffer
+      if (buff[0] == '#') {
+        // this is a commented line
+        if (fsmState == fsmFileOpen) {
+          // first line of the file; short sequence name
+          fsmState = fsmHandleNameLine;
+        } else {
+          // other lines of the file; sequence description
+          fsmState = fsmHandleDescriptionLine;
+        }
+      } else {
+        // data line (not a comment)
+        fsmState = fsmHandleDataLine;
+      }
+    } else {
+      // errors?
+//      Serial.println("WTF?!!");
+      fsmState = fsmSequenceStop;
+    }
+  }
+  // make sure we do not try to read file when not desired!
+  readNextLine = 0;
 
   // handle FSM states
-  if (fsmState == 1) {
+  if (fsmState == fsmFileSelect) {
     if ((filenames[2][0] != 0) && (! dataFile)) {
       // data file not yet opened.. open it!
       dataFile = SD.open(filenames[2]);
@@ -682,82 +737,89 @@ void loop() {
       oled.fillRect(42, 40, 78, 10, BLACK);
       oledDrawText(42, 40, dataFile.name(), RED);
       // move to next state
-      fsmState = 2;
+      fsmState = fsmFileOpen;
+      readNextLine = 1;
     } else {
       // error: move to intial state
-      fsmState = 0;
+      fsmState = fsmIdle;
     }
 
-  } else if (fsmState == 2) {
-    // data file should be opened
-    if (dataFile) {
-      // Serial.print("File: "); Serial.print(dataFile.name()); Serial.print(" size "); Serial.println(dataFile.size());
-  
-      // file contents is XXAAAAAA XXBBBBBB C
-      //  XX       - control bytes (00 by default)
-      //  AAAAAA   - panel 1 RGB color
-      //  BBBBBB   - panel 2 RGB color
-      //  C        - time (in 100 ms)
-      // Example:
-      // 00A7ED68 00A6FdEC 86
-      // 00000000 00000000 64
-      // 005217Bc 00A3faaA 97
-      // 00000000 00000000 66
-      // 00c02904 00EeC773 21
-      // Notes:
-      //   - color 000000 means LED off
-  
-      buffLen = dataFile.readBytesUntil('\n', buff, 31);
-      if (buffLen > 0) {
-        // terminate the string
-        buff[buffLen] = '\0';
-        Serial.print(">line "); Serial.print(buffLen); Serial.print(" : "); Serial.print(buff); Serial.println();
-        // parse both panel colors and time to delay
-        color1 = parseHex(buff, 8);
-        color2 = parseHex(buff+9, 8);
-        timeDelay = parseInt(buff+18, 2);
-        Serial.print("col1: "); Serial.print(color1, HEX);
-        Serial.print(" col2: "); Serial.print(color2, HEX);
-        Serial.println();
-        // time in ms to wait in next FSM state
-        timeDelay *= 100;
-        Serial.print("delay: "); Serial.print(timeDelay); Serial.println();
+  } else if (fsmState == fsmFileOpen) {
+    // nothing to do here; see buffer handling above
+    readNextLine = 1;
 
-        // set lights on both panels
-        setColorRGB(0, (uint8_t)(color1 >> 16), (uint8_t)(color1 >> 8), (uint8_t)(color1));
-        setColorRGB(1, (uint8_t)(color2 >> 16), (uint8_t)(color2 >> 8), (uint8_t)(color2));
-        // LED brightness 25%
-//        setBrightness(25);
-        render();
-        // record current time in ms, used in next state
-        timeMillis = millis();
-        
-        // move to next state
-        fsmState = 3;
-        
-      } else {
-        Serial.println("EOF.. rewind!");
-        // start all over again..
-        dataFile.seek(0);
-        // remain in this state, next time around we will be
-        // hitting code above this else
-      }
-    } else {
-      // error: move to intial state
-      fsmState = 0;
-    }
+  } else if (fsmState == fsmHandleNameLine) {
+    // buffer holds short sequence name
+    // TODO: show it on display
+    readNextLine = 1;
 
-  } else if (fsmState == 3) {
+  } else if (fsmState == fsmHandleDescriptionLine) {
+    // buffer holds (part of) sequence description
+    // TODO: show it on display
+    readNextLine = 1;
+    
+  } else if (fsmState == fsmHandleDataLine) {
+    // Serial.print("File: "); Serial.print(dataFile.name()); Serial.print(" size "); Serial.println(dataFile.size());
+
+    // file data line : XX AAAAAA YY BBBBBB CC
+    //  XX       - panel 1 control byte  (00 by default)
+    //  AAAAAA   - panel 1 RGB color
+    //  YY       - panel 2 control byte  (00 by default)
+    //  BBBBBB   - panel 2 RGB color
+    //  CC       - time (in 100 ms)
+    // Example:
+    // # this is a name (max 31 chars)
+    // # this is description (max 255 chars)
+    // # description can span several lines..
+    // # first line without leading # is data line
+    // 00 70E79f 00 E6d3e7 36
+    // 00 000000 00 000000 18
+    // 00 cFdbCe 00 FcC2a5 18
+    // 00 000000 00 000000 13
+    // 00 0245B5 00 BdcB5e 23
+    // Notes:
+    //   - color 000000 means LED off
+
+    Serial.print(">line "); Serial.print(buffLen); Serial.print(" : "); Serial.print(buff); Serial.println();
+    // parse both panel colors and time to delay
+    mode1 = parseHex(buff, 2);
+    color1 = parseHex(buff+3, 8);
+    mode2 = parseHex(buff+10, 2);
+    color2 = parseHex(buff+13, 8);
+    timeDelay = parseInt(buff+20, 2);
+    Serial.print("mode1: "); Serial.print(mode1, HEX);
+    Serial.print(" col1: "); Serial.print(color1, HEX);
+    Serial.print(" mode2: "); Serial.print(mode2, HEX);
+    Serial.print(" col2: "); Serial.print(color2, HEX);
+    Serial.println();
+    // time in ms to wait in next FSM state
+    timeDelay *= 100;
+    Serial.print("delay: "); Serial.print(timeDelay); Serial.println();
+
+    // set lights on both panels
+    setColorRGB(0, (uint8_t)(color1 >> 16), (uint8_t)(color1 >> 8), (uint8_t)(color1));
+    setColorRGB(1, (uint8_t)(color2 >> 16), (uint8_t)(color2 >> 8), (uint8_t)(color2));
+    render();
+    
+    // record current time in ms, used in next state
+    timeMillis = millis();
+    
+    // move to next state
+    fsmState = fsmSequenceRun;
+
+  } else if (fsmState == fsmSequenceRun) {
     // wait until delay elapsed
     if ((millis() - timeMillis) < timeDelay) {
       // wait a little bit..
       delay(10);
+      // remain is this state, do not read next line!
     } else {
-      // go to previous state, read next line from file
-      fsmState = 2;
+      // go to previous state, read next line from file!
+      fsmState = fsmHandleDataLine;
+      readNextLine = 1;
     }
     
-  } else if (fsmState == 4) {
+  } else if (fsmState == fsmSequenceStop) {
     // close the file if opened
     if (dataFile) {
       // close the file
@@ -773,11 +835,11 @@ void loop() {
     render();
 
     // move to intial state
-    fsmState = 0;
+    fsmState = fsmIdle;
 
   } else {
     // error: move to intial state
-    fsmState = 0;
+    fsmState = fsmIdle;
   }
 
 } // loop()
