@@ -107,9 +107,9 @@ void senseEncoderRotated1() {
      }
    }
   previousStateCLK = currentStateCLK;
-  // signal the change when 4 pulses of encoder were detected
+  // signal the change when 2 pulses of encoder were detected
   // this filters undesired movement of the encoder when pressing the switch
-  if ((subCounter % 4) == 0) {
+  if ((subCounter % 2) == 0) {
     subCounter = 1;
     encoderRotated = true;
   }
@@ -568,7 +568,7 @@ void setup() {
   // Setup Serial Monitor
   Serial.begin (115200);
   while (!Serial) {}
-  Serial.println("panel lights v0.9");
+  Serial.println("panel lights v0.9b");
   
   // clear the display
 //  timeMillis= millis();/
@@ -576,7 +576,7 @@ void setup() {
 //  timeMillis= millis() - timeMillis;/
 //  Serial.print("OLED clear took ");/
   Serial.println(timeMillis, DEC);
-  oledDrawText(0, 0, "panel lights v0.9", RED);
+  oledDrawText(0, 0, "panel lights v0.9b", RED);
 
   if (! SD.begin(SDCS_PIN)) {
     Serial.println("SD init failed!");
@@ -598,22 +598,16 @@ void setup() {
   Serial.println("setup() done!");
   Serial.print("# files: ");
   Serial.println(nrFiles);
-  sprintf(buff, "# files %d", nrFiles);
+  sprintf(buff, "Files   %3d / %3d", counter + 1, nrFiles);
   oledDrawText(0, 10, buff, WHITE);
-
-  sprintf(buff, "Counter %d", counter);
-  oledDrawText(0, 20, buff, YELLOW);
-
-  sprintf(buff, "Button ???");
-  oledDrawText(0, 30, buff, YELLOW);
-
-  sprintf(buff, "Opened <none>");
-  oledDrawText(0, 40, buff, YELLOW);
 
   tmpInt = (int)brightness;
   tmpInt *= 100;
-  sprintf(buff, "BRIGHT: %3d %%", tmpInt >> 8);
-  oledDrawText(0, 50, buff, YELLOW);
+  sprintf(buff, "Power   %3d %%", tmpInt >> 8);
+  oledDrawText(0, 20, buff, YELLOW);
+
+  sprintf(buff, "Active   %s", "");
+  oledDrawText(0, 30, buff, YELLOW);
 
   // blink LEDs
   setColorRGB(0, 0, 0, 255);
@@ -639,11 +633,7 @@ void loop() {
   // are different then a button press has occured
   buttonState = digitalRead(inputSW);
   if (buttonState != previousStateSW) {
-    Serial.print("SW button: "); Serial.println(buttonState ? "UP" : "DOWN");
-    sprintf(buff, "%s", buttonState ? "UP" : "DOWN");
-    oled.fillRect(42, 30, 24, 10, BLACK);
-    oledDrawText(42, 30, buff, YELLOW);
-
+    Serial.print("Switch: "); Serial.println(buttonState ? "U" : "D");
     if (buttonState) {
       // button was released
       digitalWrite(LED_BUILTIN, LOW);
@@ -723,9 +713,9 @@ void loop() {
           if (counter >= nrFiles) counter = nrFiles - 1;
           Serial.print("Direction: "); Serial.print(encdir); Serial.print(" -- Value: "); Serial.println(counter);
 
-          oled.fillRect(48, 20, 12, 10, BLACK);
-          sprintf(buff, "%d", counter);
-          oledDrawText(48, 20, buff, YELLOW);
+          // update the current file index on display
+          sprintf(buff, "Files   %3d / %3d", counter + 1, nrFiles);
+          oledDrawText(0, 10, buff, WHITE);
 
           getFileNames(root, counter, 5);
 
@@ -740,9 +730,11 @@ void loop() {
               bgcolor = BLACK;
               fgcolor = GREEN;
             }
-            oled.fillRect(0, i*10+60, 100, 10, BLACK);
+            // show the filename or clear the line
             if (filenames[i][0] != 0) {
               oledDrawText(0, i*10+60, filenames[i], fgcolor, bgcolor);
+            } else {
+              oled.fillRect(0, i*10+60, 100, 10, BLACK);
             }
           }
       }
@@ -753,8 +745,9 @@ void loop() {
       // data file not yet opened.. open it!
       dataFile = SD.open(filenames[2]);
       Serial.print("opened "); Serial.println(dataFile.name());
-      oled.fillRect(42, 40, 78, 10, BLACK);
-      oledDrawText(42, 40, dataFile.name(), RED);
+      oled.fillRect(0, 30, 128, 10, BLACK);
+      sprintf(buff, "Active   %s", dataFile.name());
+      oledDrawText(0, 30, buff, YELLOW);
       // move to next state
       fsmState = fsmFileOpen;
       readNextLine = 1;
@@ -839,8 +832,8 @@ void loop() {
         if (tmpInt < 25) tmpInt = 25;
         brightness = tmpInt;
         tmpInt *= 100;
-        sprintf(buff, "BRIGHT: %3d %%", tmpInt >> 8);
-        oledDrawText(0, 50, buff, YELLOW);
+        sprintf(buff, "Power   %3d %%", tmpInt >> 8);
+        oledDrawText(0, 20, buff, YELLOW);
       }
       encoderRotated = false;
 
@@ -858,8 +851,9 @@ void loop() {
       // close the file
       Serial.print("closing file "); Serial.println(dataFile.name());
       dataFile.close();
-      oled.fillRect(42, 40, 78, 10, BLACK);
-      oledDrawText(42, 40, "<none>", RED);
+      oled.fillRect(0, 30, 128, 10, BLACK);
+      sprintf(buff, "Active   %s", "");
+      oledDrawText(0, 30, buff, YELLOW);
     }
 
     // turn off the lights
