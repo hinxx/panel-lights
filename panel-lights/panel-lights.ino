@@ -58,6 +58,7 @@ uint8_t pinMask;
 uint32_t t_f;
 // LED brightness 0-255 (stored as +1)
 uint8_t brightness;
+int tmpInt;
 
 uint8_t mode1, mode2;
 uint32_t color1, color2;
@@ -587,6 +588,11 @@ void setup() {
   previousStateCLK = digitalRead(inputCLK);
   previousStateSW = digitalRead(inputSW);
 
+  t_f = micros();
+
+  // intial LED brightness ~10%
+  setBrightness(25);
+
   root = SD.open("/");
   printDirectory(root);
   Serial.println("setup() done!");
@@ -604,10 +610,10 @@ void setup() {
   sprintf(buff, "Opened <none>");
   oledDrawText(0, 40, buff, YELLOW);
 
-  t_f = micros();
-
-  // LED brightness 25%
-  setBrightness(25);
+  tmpInt = (int)brightness;
+  tmpInt *= 100;
+  sprintf(buff, "BRIGHT: %3d %%", tmpInt >> 8);
+  oledDrawText(0, 50, buff, YELLOW);
 
   // blink LEDs
   setColorRGB(0, 0, 0, 255);
@@ -629,41 +635,6 @@ void setup() {
 
 void loop() {
 
-  if (encoderRotated) {
-    // new counter value is either +1 or -1
-    counter = counter + counterChange;
-    // clip to number of files found on the SD card
-    if (counter < 0) counter = 0;
-    if (counter >= nrFiles) counter = nrFiles - 1;
-    Serial.print("Direction: "); Serial.print(encdir); Serial.print(" -- Value: "); Serial.println(counter);
-
-    oled.fillRect(48, 20, 12, 10, BLACK);
-    sprintf(buff, "%d", counter);
-    oledDrawText(48, 20, buff, YELLOW);
-
-    getFileNames(root, counter, 5);
-    
-    uint16_t fgcolor = GREEN;
-    uint16_t bgcolor = BLACK;
-    // show 5 files max
-    for(uint16_t i = 0; i < 5; i++) {
-      if (i == 2) {
-        bgcolor = WHITE;
-        fgcolor = RED;
-      } else {
-        bgcolor = BLACK;
-        fgcolor = GREEN;
-      }
-      oled.fillRect(0, i*10+60, 100, 10, BLACK);
-      if (filenames[i][0] != 0) {
-        oledDrawText(0, i*10+60, filenames[i], fgcolor, bgcolor);
-      }
-    }
-    
-    encoderRotated = false;
-   } 
-
-  
   // If the previous and the current state of the inputSW
   // are different then a button press has occured
   buttonState = digitalRead(inputSW);
@@ -742,7 +713,42 @@ void loop() {
   readNextLine = 0;
 
   // handle FSM states
-  if (fsmState == fsmFileSelect) {
+  if (fsmState == fsmIdle) {
+
+      if (encoderRotated) {
+          // new counter value is either +1 or -1
+          counter = counter + counterChange;
+          // clip to number of files found on the SD card
+          if (counter < 0) counter = 0;
+          if (counter >= nrFiles) counter = nrFiles - 1;
+          Serial.print("Direction: "); Serial.print(encdir); Serial.print(" -- Value: "); Serial.println(counter);
+
+          oled.fillRect(48, 20, 12, 10, BLACK);
+          sprintf(buff, "%d", counter);
+          oledDrawText(48, 20, buff, YELLOW);
+
+          getFileNames(root, counter, 5);
+
+          uint16_t fgcolor = GREEN;
+          uint16_t bgcolor = BLACK;
+          // show 5 files max
+          for(uint16_t i = 0; i < 5; i++) {
+            if (i == 2) {
+              bgcolor = WHITE;
+              fgcolor = RED;
+            } else {
+              bgcolor = BLACK;
+              fgcolor = GREEN;
+            }
+            oled.fillRect(0, i*10+60, 100, 10, BLACK);
+            if (filenames[i][0] != 0) {
+              oledDrawText(0, i*10+60, filenames[i], fgcolor, bgcolor);
+            }
+          }
+      }
+      encoderRotated = false;
+
+  } else if (fsmState == fsmFileSelect) {
     if ((filenames[2][0] != 0) && (! dataFile)) {
       // data file not yet opened.. open it!
       dataFile = SD.open(filenames[2]);
@@ -816,7 +822,7 @@ void loop() {
     
     // record current time in ms, used in next state
     timeMillis = millis();
-    
+
     // move to next state
     fsmState = fsmSequenceRun;
 
@@ -825,7 +831,21 @@ void loop() {
     if ((millis() - timeMillis) < timeDelay) {
       // wait a little bit..
       delay(10);
+
+      // if encoder value changed adjust brightness accordingly
+      if (encoderRotated) {
+        tmpInt = (int)brightness + (counterChange * 10);
+        if (tmpInt > 255) tmpInt = 255;
+        if (tmpInt < 25) tmpInt = 25;
+        brightness = tmpInt;
+        tmpInt *= 100;
+        sprintf(buff, "BRIGHT: %3d %%", tmpInt >> 8);
+        oledDrawText(0, 50, buff, YELLOW);
+      }
+      encoderRotated = false;
+
       // remain is this state, do not read next line!
+
     } else {
       // go to previous state, read next line from file!
       fsmState = fsmHandleDataLine;
