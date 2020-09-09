@@ -39,7 +39,8 @@
 #define WHITE           0xFFFF
 
 // Rotary encoder
-int counter, previousCounter;
+int counter;
+int8_t subCounter, counterChange;
 int currentStateCLK, previousStateCLK; 
 int buttonState, previousStateSW;
 String encdir ="";
@@ -55,13 +56,18 @@ uint8_t rgb_arr[NUM_PANELS*3] = {0};
 volatile uint8_t *port;
 uint8_t pinMask;
 uint32_t t_f;
-uint8_t           brightness; ///< Strip brightness 0-255 (stored as +1)
+// LED brightness 0-255 (stored as +1)
+uint8_t brightness;
 
 uint8_t mode1, mode2;
 uint32_t color1, color2;
 uint32_t timeMillis, timeDelay;
 char buff[32];
 size_t buffLen;
+// https://en.wikipedia.org/wiki/8.3_filename
+// 8.3 filenames are limited to at most eight characters (after any directory specifier),
+// followed optionally by a filename extension consisting of a period . and at most
+// three further characters.
 char filenames[5][13];
 
 File root;
@@ -90,20 +96,22 @@ volatile bool encoderRotated = false;
 void senseEncoderRotated1() {
   currentStateCLK = digitalRead(inputCLK);
    if (currentStateCLK != previousStateCLK) {
+     subCounter++;
      if (digitalRead(inputDT) != currentStateCLK) {
-       if (counter > 0) {
-        counter--;
-       }
        encdir ="CCW";
+       counterChange = -1;
      } else {
-        if (counter < (nrFiles - 1)) {
-           counter++;
-        }
        encdir ="CW";
+       counterChange = 1;
      }
    }
   previousStateCLK = currentStateCLK;
-  encoderRotated = true;
+  // signal the change when 4 pulses of encoder were detected
+  // this filters undesired movement of the encoder when pressing the switch
+  if ((subCounter % 4) == 0) {
+    subCounter = 1;
+    encoderRotated = true;
+  }
 }
 
 void oledDrawText(uint16_t x, uint16_t y, const char *text, uint16_t color, uint16_t bgcolor = BLACK) {
@@ -112,7 +120,7 @@ void oledDrawText(uint16_t x, uint16_t y, const char *text, uint16_t color, uint
   oled.print(text);
 }
 
-void printDirectory(File dir, int numTabs) {
+void printDirectory(File dir) {
   while (true) {
     File entry =  dir.openNextFile();
     if (! entry) {
@@ -143,8 +151,6 @@ void printDirectory(File dir, int numTabs) {
 void getFileNames(File dir, uint16_t start, uint16_t count) {
   uint16_t index = 0;
   uint16_t pos = 0;
-  uint16_t pre = 2;
-  uint16_t post = 2;
 
   if (start == 0) {
     pos++;
@@ -189,7 +195,7 @@ void getFileNames(File dir, uint16_t start, uint16_t count) {
       if ((index >= start) && (index < (start + count))) {
 //        Serial.print(" ++ index "); Serial.print(index); Serial.print(", pos "); Serial.println(pos);
         strcpy(filenames[pos], entry.name());
-        filenames[pos][13] = 0;
+        filenames[pos][12] = 0;
         pos++;
       } else {
 //        Serial.print(" -- index "); Serial.print(index); Serial.print(", pos "); Serial.println(pos);
@@ -536,7 +542,7 @@ void setup() {
   memset(filenames, 0, sizeof(filenames));
   fsmState = fsmIdle;
   counter = 0;
-  previousCounter = -1;
+  subCounter = 1;
   brightness = 0;
   
   // Set LED pin as output
@@ -561,7 +567,7 @@ void setup() {
   // Setup Serial Monitor
   Serial.begin (115200);
   while (!Serial) {}
-  Serial.println("panel lights v0.8");
+  Serial.println("panel lights v0.9");
   
   // clear the display
 //  timeMillis= millis();/
@@ -569,7 +575,7 @@ void setup() {
 //  timeMillis= millis() - timeMillis;/
 //  Serial.print("OLED clear took ");/
   Serial.println(timeMillis, DEC);
-  oledDrawText(0, 0, "panel lights v0.8", RED);
+  oledDrawText(0, 0, "panel lights v0.9", RED);
 
   if (! SD.begin(SDCS_PIN)) {
     Serial.println("SD init failed!");
@@ -582,7 +588,7 @@ void setup() {
   previousStateSW = digitalRead(inputSW);
 
   root = SD.open("/");
-  printDirectory(root, 0);
+  printDirectory(root);
   Serial.println("setup() done!");
   Serial.print("# files: ");
   Serial.println(nrFiles);
@@ -616,6 +622,7 @@ void setup() {
 
   delay(100);
 
+  // force the SD display update for the first time
   encoderRotated = true;
   
 } // setup()
@@ -623,7 +630,12 @@ void setup() {
 void loop() {
 
   if (encoderRotated) {
-     Serial.print("Direction: "); Serial.print(encdir); Serial.print(" -- Value: "); Serial.println(counter);
+    // new counter value is either +1 or -1
+    counter = counter + counterChange;
+    // clip to number of files found on the SD card
+    if (counter < 0) counter = 0;
+    if (counter >= nrFiles) counter = nrFiles - 1;
+    Serial.print("Direction: "); Serial.print(encdir); Serial.print(" -- Value: "); Serial.println(counter);
 
     oled.fillRect(48, 20, 12, 10, BLACK);
     sprintf(buff, "%d", counter);
@@ -633,6 +645,7 @@ void loop() {
     
     uint16_t fgcolor = GREEN;
     uint16_t bgcolor = BLACK;
+    // show 5 files max
     for(uint16_t i = 0; i < 5; i++) {
       if (i == 2) {
         bgcolor = WHITE;
@@ -843,3 +856,4 @@ void loop() {
   }
 
 } // loop()
+
